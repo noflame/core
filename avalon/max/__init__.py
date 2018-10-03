@@ -3,7 +3,6 @@
 Anything that isn't defined here is INTERNAL and unreliable for external use.
 
 """
-print("init d:\\max")
 import pipeline
 from .pipeline import (
     install,
@@ -26,7 +25,7 @@ from .pipeline import (
 #     is_locked,
 #     lock_ignored,
 
-print("d:\\max .pipeline install OK")
+
 # from .lib import (
 #     export_alembic,
 #     lsattr,
@@ -42,17 +41,18 @@ print("d:\\max .pipeline install OK")
 #     unique_namespace,
 # )
 
+__all__ = [
+    "install",
+    "uninstall",
 
-__all__ = ["install"]
-#     "uninstall",
-# 
-#     "Creator",
-#     "Loader",
-# 
-#     "ls",
-#     "load",
-#     "create",
-#     "remove",
+    "Creator",
+    "Loader",
+
+    "ls",
+    "load",
+    "create",
+    "remove"
+]
 #     "update",
 #     "read",
 #     "publish",
@@ -76,4 +76,3 @@ __all__ = ["install"]
     #
     #     "containerise",
 
-print("init d:\\max done.")

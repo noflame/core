@@ -3,15 +3,18 @@ import sys
 import errno
 import importlib
 import contextlib
+# sys.path.append(r'C:\Users\noflame\.p2\pool\plugins\org.python.pydev.core_6.4.3.201807050139\pysrc')
+# import pydevd
 
-print("befor import MaxPlus")
-# from maya import cmds, OpenMaya
-from MaxPlus import NotificationCodes, NotificationManager, PathManager
-print("after import MaxPlus")
+print("prepare Avalon Max Pipeline")
+# pydevd.settrace("192.168.1.35", suspend=True)
+import MaxPlus as MP
+from MaxPlus import NotificationCodes as NC
+from MaxPlus import NotificationManager as NM
+from MaxPlus import PathManager as PM
+from MaxPlus import ActionFactory as AF
 
-print "pyblish imported"
 from pyblish import api as pyblish
-
 
 from . import lib
 from ..lib import logger
@@ -19,16 +22,183 @@ from .. import api, io, schema
 from ..vendor import six
 from ..vendor.Qt import QtCore, QtWidgets
 
+self = sys.modules[__name__]
+self._menu_name = "avalonmax"  # Unique name of menu
+self._events = dict()  # Registered callbacks
+self._parent = None  # Main Window, it means 3dsMAX itself
+self._ignore_lock = False
+
+AVALON_CONTAINERS = ":AVALON_CONTAINERS"
+logger.info("prepare Avalon Max Pipeline")
+
 
 def install(config):
+    '''config: module, get from AVALON_CONFIG'''
+
+    self._menu_name = api.Session["AVALON_LABEL"]
+
     print(type(config))
     print(dir(config))
-    print("module name: %s" %(config.__name__))
-    print("module : %s" %(config.__file__))
+    print("module name: %s" % (config.__name__))
+    print("module : %s" % (config.__file__))
+
+    _register_callbacks()
+    _register_events()
+    _set_project()
+
+    _install_menu()
+
+    # register host
+    pyblish.register_host("max")
+
+    # install config
+    config = find_host_config(config)
+    if hasattr(config, "install"):
+        config.install()
 
 
-def uninstall():
+def _register_callbacks():
+    '''
+    # reg dcc change call_back make avalon can reactorto those signal
+        # maya                    max
+        # _on_max_initialized -> SystemStartup
+        # _on_scene_open      -> FilePostOpen
+        # _on_scene_new       -> SystemPostNew
+        # _before_scene_save  -> FilePreSave
+        # _on_scene_save      -> FilePostSave
+    '''
+    # remove pre-install call_back
+    for _, handle in self._events.items():
+        try:
+            NM.Unregister(handle)
+        except Exception:
+            pass
+    self._events.clear()
+
+    # install callback
+    self._events[_system_starup] = NM.Register(NC.SystemStartup, _system_starup)
+    self._events[_file_post_open] = NM.Register(NC.FilePostOpen, _file_post_open)
+    self._events[_system_post_new] = NM.Register(NC.SystemPostNew, _system_post_new)
+    self._events[_file_pre_save] = NM.Register(NC.FilePreSave, _file_pre_save)
+    self._events[_file_post_save] = NM.Register(NC.FilePostSave, _file_post_save)
+
+    logger.info("Installed event handler SystemPostNew..")
+    logger.info("Installed event handler FilePreSave..")
+    logger.info("Installed event handler SystemPostNew..")
+    logger.info("Installed event handler SystemStartup..")
+    logger.info("Installed event handler FilePostOpen..")
+
+
+def _system_starup(*args):
+    api.emit('init', args)
+
+    # run in command mode?
+
+    # reference to 3dsMAX itself
+    self._parent = MP.GetQMaxWindow()  # max2016 sp2
+
+
+def _file_post_open(*args):
+    api.emit('open', args)
+
+
+def _system_post_new(*args):
+    api.emit('new', args)
+
+
+def _file_pre_save(*args):
+    api.emit('before_save', args)
+
+
+def _file_post_save(*args):
+    api.emit('save', args)
+
+
+def _register_events():
+    api.on("taskChanged", _on_task_changed)
+
+    logger.info("Installed event callback for 'taskChanged'..")
+
+
+def _set_project():
+    pass
+
+
+def _install_menu():
+    from ..tools import (
+        creator,
+        loader,
+        publish,
+        cbloader,
+        cbsceneinventory,
+        contextmanager
+    )
+
+    _uninstall_menu()
+
+    def deferred():
+        print("building menu")
+        ava_menu_name = self._menu_name
+        category_name = api.Session["AVALON_LABEL"]
+        context_menu_name = "{}, {}".format(api.Session["AVALON_ASSET"], api.Session["AVALON_TASK"])
+        ava_mb = MP.MenuBuilder(ava_menu_name)
+        context_mb = MP.MenuBuilder(context_menu_name)
+
+        act_set_Context = AF.Create(category_name, 'Set Context', lambda *args: contextmanager.show(parent=self._parent))
+
+        context_mb.AddItem(act_set_Context)        
+
+        ava_menu = ava_mb.Create(MP.MenuManager.GetMainMenu())
+        context_menu = context_mb.Create(ava_menu)
+
+    QtCore.QTimer.singleShot(100, deferred)
+
+
+def _uninstall_menu():
+    print("unistall menu")
+    
+    if MP.MenuManager.MenuExists(self._menu_name):
+        MP.MenuManager.UnregisterMenu(self._menu_name)
+
+
+def find_host_config(config):
+    try:
+        config = importlib.import_module(config.__name__ + ".max")
+    except ImportError as exc:
+        if str(exc) != "No module name {}".format(config.__name__ + ".max"):
+            raise
+        config = None
+
+    return config
+
+
+def _on_task_changed(*args):
+    # update menu task label
+    for arg in args:
+        print('{}:{}'.format(type(arg), arg))
+    _update_menu_task_label()
+
+
+def _update_menu_task_label():
+    """Update the task label in Avalon menu to current session"""
+
+    object_name = "{}|currentContext".format(self._menu_name)
+    print('self._menu_name:{}'.format(self._menu))
+    # to be continue
+
+
+def uninstall(config):
     print("uninstall start")
+    config = find_host_config(config)
+    if hasattr(config, "uninstall"):
+        config.uninstall()
+
+    _uninstall_menu()
+
+    pyblish.deregister_host("mayabatch")
+    pyblish.deregister_host("mayapy")
+    pyblish.deregister_host("maya")
+
     print("uninstall end")
 
 
@@ -111,6 +281,8 @@ def ls():
     assets on disk, it lists assets already loaded in Max; once loaded
     they are called 'containers'
     """
+    pass
+
 
 def load(Loader,
          representation,
@@ -166,9 +338,13 @@ def load(Loader,
         "Running '%s' on '%s'" % (Loader.__name__, asset["name"])
     )
 
+
 class Creator():
-    pass 
+    pass
 
 
 class Loader():
     pass
+
+
+print("install Avalon Max Done")
