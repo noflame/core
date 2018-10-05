@@ -3,10 +3,10 @@ import sys
 import errno
 import importlib
 import contextlib
+#print("prepare Avalon Max Pipeline")
+
 # sys.path.append(r'C:\Users\noflame\.p2\pool\plugins\org.python.pydev.core_6.4.3.201807050139\pysrc')
 # import pydevd
-
-print("prepare Avalon Max Pipeline")
 # pydevd.settrace("192.168.1.35", suspend=True)
 import MaxPlus as MP
 from MaxPlus import NotificationCodes as NC
@@ -19,6 +19,7 @@ from pyblish import api as pyblish
 from . import lib
 from ..lib import logger
 from .. import api, io, schema
+from ..tools import workfiles
 from ..vendor import six
 from ..vendor.Qt import QtCore, QtWidgets
 
@@ -96,6 +97,7 @@ def _system_starup(*args):
 
     # reference to 3dsMAX itself
     self._parent = MP.GetQMaxWindow()  # max2016 sp2
+    _uninstall_menu()
 
 
 def _file_post_open(*args):
@@ -116,7 +118,6 @@ def _file_post_save(*args):
 
 def _register_events():
     api.on("taskChanged", _on_task_changed)
-
     logger.info("Installed event callback for 'taskChanged'..")
 
 
@@ -133,7 +134,7 @@ def _install_menu():
         cbsceneinventory,
         contextmanager
     )
-
+    
     _uninstall_menu()
 
     def deferred():
@@ -142,12 +143,21 @@ def _install_menu():
         category_name = api.Session["AVALON_LABEL"]
         context_menu_name = "{}, {}".format(api.Session["AVALON_ASSET"], api.Session["AVALON_TASK"])
         ava_mb = MP.MenuBuilder(ava_menu_name)
-        context_mb = MP.MenuBuilder(context_menu_name)
+        context_mb = MP.MenuBuilder(context_menu_name)        
 
-        act_set_Context = AF.Create(category_name, 'Set Context', lambda *args: contextmanager.show(parent=self._parent))
-
-        context_mb.AddItem(act_set_Context)        
-
+        act_set_Context = AF.Create(category_name, 'Set Context', lambda *args: contextmanager.show(set_func=MP.AttachQWidgetToMax))
+        act_create = AF.Create(category_name, 'Create...', lambda *args: creator.show(set_func=MP.AttachQWidgetToMax))
+        act_load = AF.Create(category_name, 'Load...', lambda *args: loader.show(set_func=MP.AttachQWidgetToMax))
+        act_publish = AF.Create(category_name, 'Publish...', lambda *args: publish.show())
+        act_manage = AF.Create(category_name, 'Manage...', lambda *args: cbsceneinventory.show(set_func=MP.AttachQWidgetToMax))
+        
+        
+        context_mb.AddItem(act_set_Context)
+        ava_mb.AddItem(act_create)
+        ava_mb.AddItem(act_load)
+        ava_mb.AddItem(act_publish)
+        ava_mb.AddItem(act_manage)
+        
         ava_menu = ava_mb.Create(MP.MenuManager.GetMainMenu())
         context_menu = context_mb.Create(ava_menu)
 
@@ -155,10 +165,16 @@ def _install_menu():
 
 
 def _uninstall_menu():
-    print("unistall menu")
-    
     if MP.MenuManager.MenuExists(self._menu_name):
         MP.MenuManager.UnregisterMenu(self._menu_name)
+
+    context_menu_name = "{}, {}".format(api.Session["AVALON_ASSET"], api.Session["AVALON_TASK"])
+    if MP.MenuManager.MenuExists(context_menu_name):
+            MP.MenuManager.UnregisterMenu(context_menu_name)
+
+
+def launch_workfiles_app(*args):
+    workfiles.show(MP.Core.EvalMAXScript('maxfilepath').Get())
 
 
 def find_host_config(config):
@@ -183,7 +199,7 @@ def _update_menu_task_label():
     """Update the task label in Avalon menu to current session"""
 
     object_name = "{}|currentContext".format(self._menu_name)
-    print('self._menu_name:{}'.format(self._menu))
+    print('self._menu_name:{}'.format(self._menu_name))
     # to be continue
 
 
@@ -195,15 +211,8 @@ def uninstall(config):
 
     _uninstall_menu()
 
-    pyblish.deregister_host("mayabatch")
-    pyblish.deregister_host("mayapy")
-    pyblish.deregister_host("maya")
-
+    pyblish.deregister_host("max")
     print("uninstall end")
-
-
-def load():
-    print("")
 
 
 def create(name, asset, family, options=None, data=None):
