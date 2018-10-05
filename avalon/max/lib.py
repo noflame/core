@@ -14,3 +14,9 @@ def unique_namespace(namespace, format="%02d", prefix="", suffix=""):
     rel = MP.Core.EvalMAXScript(MXS)
     unique = rel.Get()
     return unique + suffix
+
+
+def maxversion():
+    major, minor, patch = MP.Core.EvalMAXScript("maxversion()").Get()
+    major = int("20{}".format((major / 1000 - 2)))
+    return (major, minor, patch)
