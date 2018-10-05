@@ -851,7 +851,7 @@ QSlider::handle:horizontal:enabled {
         return super(Window, self).closeEvent(event)
 
 
-def show(root=None, debug=False, parent=None):
+def show(root=None, debug=False, parent=None, set_func=None):
     """Display Loader GUI
 
     Arguments:
@@ -885,7 +885,11 @@ def show(root=None, debug=False, parent=None):
         api.Session["AVALON_PROJECT"] = any_project["name"]
 
     with lib.application():
-        window = Window(parent)
+        if set_func:
+            window = Window()
+            set_func(window)
+        else:
+            window = Window(parent)
         window.show()
 
         window.refresh()

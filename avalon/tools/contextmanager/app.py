@@ -182,7 +182,7 @@ class App(QtWidgets.QDialog):
         self._assets.select_assets([assetname], expand=True)
 
 
-def show(parent=None):
+def show(parent=None, set_func=None):
 
     from ...tools import lib
     try:
@@ -192,7 +192,11 @@ def show(parent=None):
         pass
 
     with lib.application():
-        window = App(parent)
+        if set_func:
+            window = App()
+            set_func(window)
+        else:
+            window = App(parent)
         window.show()
 
         module.window = window

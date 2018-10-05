@@ -531,12 +531,13 @@ class Window(QtWidgets.QDialog):
                 self.model.refresh()
 
 
-def show(root=None, debug=False, parent=None):
+def show(root=None, debug=False, parent=None, set_func=None):
     """Display Loader GUI
 
     Arguments:
         debug (bool, optional): Run loader in debug-mode,
             defaults to False
+        set_func (function, optional): a set parent function, for 3dsmax
 
     """
 
@@ -557,7 +558,12 @@ def show(root=None, debug=False, parent=None):
         api.Session["AVALON_PROJECT"] = any_project["name"]
 
     with tools_lib.application():
-        window = Window(parent)
+        if set_func:
+            window = Window()
+            set_func(window)
+        else:
+            window = Window(parent)
+
         window.setStyleSheet(style.load_stylesheet())
         window.show()
         window.refresh()

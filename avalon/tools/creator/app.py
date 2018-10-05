@@ -422,7 +422,7 @@ class FamilyDescriptionWidget(QtWidgets.QWidget):
         self.help.setText(help)
 
 
-def show(debug=False, parent=None):
+def show(debug=False, parent=None, set_func=None):
     """Display asset creator GUI
 
     Arguments:
@@ -431,6 +431,7 @@ def show(debug=False, parent=None):
             defined in :mod:`pipeline`
         debug (bool, optional): Run loader in debug-mode,
             defaults to False
+        set_func (function, optional): a set parent function, for 3dsmax
 
     """
 
@@ -457,7 +458,11 @@ def show(debug=False, parent=None):
         module.project = any_project["name"]
 
     with lib.application():
-        window = Window(parent)
+        if set_func:
+            window = Window()
+            set_func(window)
+        else:
+            window = Window(parent)
         window.setStyleSheet(style.load_stylesheet())
         window.refresh()
         window.show()
